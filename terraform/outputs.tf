@@ -37,3 +37,8 @@ output "kubeconfig_command" {
   description = "Convenience: command to update local kubeconfig."
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
 }
+
+output "github_deploy_role_arn" {
+  description = "Set this as the AWS_DEPLOY_ROLE_ARN secret in the GitHub repo."
+  value       = aws_iam_role.github_deploy.arn
+}

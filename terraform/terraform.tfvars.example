@@ -10,3 +10,6 @@ node_max_size       = 4
 
 # Receives CloudWatch alerts via SNS. Leave empty to skip the subscription.
 alert_email = "you@example.com"
+
+# GitHub repo allowed to assume the deploy role via OIDC. Format: owner/name.
+github_repo = "emre-safa/DevOps-Case-Study"

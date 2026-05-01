@@ -57,3 +57,9 @@ variable "alert_email" {
   type        = string
   default     = ""
 }
+
+variable "github_repo" {
+  description = "GitHub repository in 'owner/name' form. Used in the OIDC trust policy so only this repo can assume the deploy role."
+  type        = string
+  default     = "emre-safa/DevOps-Case-Study"
+}
