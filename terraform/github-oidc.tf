@@ -85,7 +85,10 @@ resource "aws_eks_access_entry" "github_deploy" {
 resource "aws_eks_access_policy_association" "github_deploy_admin" {
   cluster_name  = module.eks.cluster_name
   principal_arn = aws_iam_role.github_deploy.arn
-  policy_arn    = "arn:aws:iam::aws:policy/AmazonEKSClusterAdminPolicy"
+  # NB: EKS Access Policies are a separate namespace from IAM policies.
+  # Correct ARN prefix is `arn:aws:eks::aws:cluster-access-policy/...`,
+  # NOT `arn:aws:iam::aws:policy/...`.
+  policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
   access_scope {
     type = "cluster"

@@ -49,7 +49,14 @@ jobs:
       - name: Syntax check
         run: node --check server.mjs
       - name: Run unit tests
-        run: npm test --if-present -- --passWithNoTests
+        run: |
+          # `npm init`'s default test script is `exit 1`. Skip it; only run
+          # `npm test` when a real test framework is wired up.
+          if grep -q '"no test specified"' package.json; then
+            echo "ℹ️  No real tests defined in package.json — skipping."
+          else
+            npm test
+          fi
 
   python:
     name: Python ETL (lint + import check)
