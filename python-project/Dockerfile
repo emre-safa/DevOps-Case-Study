@@ -13,8 +13,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ETL.py ./
 
-# Run as a non-root user
-RUN useradd --create-home --shell /bin/bash etl
-USER etl
+# Run as a non-root user with a pinned numeric UID so K8s manifests can
+# reference it deterministically (runAsUser: 1000).
+RUN useradd --create-home --shell /bin/bash --uid 1000 etl
+USER 1000
 
 CMD ["python", "ETL.py"]

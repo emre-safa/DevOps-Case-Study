@@ -37,6 +37,9 @@ spec:
                   cpu: "300m"
                   memory: "256Mi"
               securityContext:
+                # 1000 matches the "etl" user pinned in python-project/Dockerfile.
+                runAsUser: 1000
+                runAsGroup: 1000
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true

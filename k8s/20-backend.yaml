@@ -85,6 +85,11 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           securityContext:
+            # Numeric UID/GID required when runAsNonRoot=true so the
+            # kubelet can verify non-root before starting the container.
+            # 1000 = the "node" user in the official node:18-alpine image.
+            runAsUser: 1000
+            runAsGroup: 1000
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
