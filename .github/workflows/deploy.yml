@@ -49,14 +49,16 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # Each image is tagged with the git short SHA only. We do NOT push
+      # ":latest" because the ECR repos are immutable (terraform/ecr.tf)
+      # and "latest" would conflict on every run. The SHA is the source
+      # of truth that the deploy job feeds into the K8s manifests.
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:
           context: mern-project/client
           push: true
-          tags: |
-            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/frontend:${{ steps.tag.outputs.image_tag }}
-            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/frontend:latest
+          tags: ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/frontend:${{ steps.tag.outputs.image_tag }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
@@ -65,9 +67,7 @@ jobs:
         with:
           context: mern-project/server
           push: true
-          tags: |
-            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/backend:${{ steps.tag.outputs.image_tag }}
-            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/backend:latest
+          tags: ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/backend:${{ steps.tag.outputs.image_tag }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -76,9 +76,7 @@ jobs:
         with:
           context: python-project
           push: true
-          tags: |
-            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/etl:${{ steps.tag.outputs.image_tag }}
-            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/etl:latest
+          tags: ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/etl:${{ steps.tag.outputs.image_tag }}
           cache-from: type=gha,scope=etl
           cache-to: type=gha,mode=max,scope=etl
 
