@@ -52,7 +52,7 @@ jobs:
         run: |
           # `npm init`'s default test script is `exit 1`. Skip it; only run
           # `npm test` when a real test framework is wired up.
-          if grep -q '"no test specified"' package.json; then
+          if grep -q 'no test specified' package.json; then
             echo "ℹ️  No real tests defined in package.json — skipping."
           else
             npm test
