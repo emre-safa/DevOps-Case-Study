@@ -1,0 +1,44 @@
+# Acceptance criterion: ETL.py runs once per hour. CronJob schedule
+# "0 * * * *" → at minute 0 of every hour, in the cluster's UTC clock.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etl
+  namespace: mern
+  labels:
+    app: etl
+spec:
+  schedule: "0 * * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid           # don't overlap if a run drags
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800     # kill any run hanging > 30 min
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app: etl
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: etl
+              image: ETL_IMAGE_PLACEHOLDER     # replaced by CI
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "300m"
+                  memory: "256Mi"
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]

@@ -1,0 +1,150 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Override image tag (defaults to short SHA)"
+        required: false
+
+# OIDC: ID token requested so we can assume the deploy role without
+# storing AWS access keys as repo secrets.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}            # e.g. eu-central-1
+  CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}    # e.g. mern-devops-dev-eks
+  ECR_PREFIX: ${{ vars.ECR_PREFIX }}            # e.g. mern-devops-dev
+
+jobs:
+  build-and-push:
+    name: Build & push to ECR
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+      registry:  ${{ steps.login.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tag
+        name: Resolve image tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "image_tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: mern-project/client
+          push: true
+          tags: |
+            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/frontend:${{ steps.tag.outputs.image_tag }}
+            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: mern-project/server
+          push: true
+          tags: |
+            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/backend:${{ steps.tag.outputs.image_tag }}
+            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build & push ETL
+        uses: docker/build-push-action@v6
+        with:
+          context: python-project
+          push: true
+          tags: |
+            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/etl:${{ steps.tag.outputs.image_tag }}
+            ${{ steps.login.outputs.registry }}/${{ env.ECR_PREFIX }}/etl:latest
+          cache-from: type=gha,scope=etl
+          cache-to: type=gha,mode=max,scope=etl
+
+  deploy:
+    name: Apply to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: production
+      url: ${{ steps.url.outputs.endpoint }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+
+      - name: Render & apply manifests
+        env:
+          REGISTRY:  ${{ needs.build-and-push.outputs.registry }}
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          cd k8s
+
+          FRONTEND_IMAGE="${REGISTRY}/${ECR_PREFIX}/frontend:${IMAGE_TAG}"
+          BACKEND_IMAGE="${REGISTRY}/${ECR_PREFIX}/backend:${IMAGE_TAG}"
+          ETL_IMAGE="${REGISTRY}/${ECR_PREFIX}/etl:${IMAGE_TAG}"
+
+          # Apply infra-shaped manifests (namespace, secrets, mongo, np, pdb).
+          # Secrets in 10-mongodb-secret.yaml are placeholders; in real life
+          # they're provisioned out-of-band (External Secrets / SealedSecrets).
+          kubectl apply -f 00-namespace.yaml
+          kubectl apply -f 10-mongodb-secret.yaml
+          kubectl apply -f 11-mongodb-statefulset.yaml
+          kubectl apply -f 60-networkpolicies.yaml
+          kubectl apply -f 61-pdb.yaml
+          kubectl apply -f 40-ingress.yaml
+
+          # Apply workloads with the freshly-built image tags.
+          sed "s|BACKEND_IMAGE_PLACEHOLDER|${BACKEND_IMAGE}|g" 20-backend.yaml | kubectl apply -f -
+          sed "s|FRONTEND_IMAGE_PLACEHOLDER|${FRONTEND_IMAGE}|g" 30-frontend.yaml | kubectl apply -f -
+          sed "s|ETL_IMAGE_PLACEHOLDER|${ETL_IMAGE}|g" 50-etl-cronjob.yaml | kubectl apply -f -
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n mern rollout status deploy/backend --timeout=5m
+          kubectl -n mern rollout status deploy/frontend --timeout=5m
+          kubectl -n mern rollout status statefulset/mongodb --timeout=5m
+
+      - id: url
+        name: Resolve ingress endpoint
+        run: |
+          for i in $(seq 1 30); do
+            HOST=$(kubectl -n mern get ingress mern-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || true)
+            if [ -n "$HOST" ]; then
+              echo "endpoint=http://$HOST" >> "$GITHUB_OUTPUT"
+              echo "Ingress: http://$HOST"
+              exit 0
+            fi
+            echo "Waiting for ALB..."
+            sleep 10
+          done
+          echo "Ingress hostname not yet provisioned; check ALB controller logs."
+          exit 0

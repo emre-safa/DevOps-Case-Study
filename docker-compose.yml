@@ -1,0 +1,67 @@
+# Local-only smoke test stack. Mirrors the K8s topology (frontend → backend
+# → mongo) closely enough to catch wiring bugs before they hit the cluster.
+#
+# Usage:
+#   docker compose up --build
+#   open http://localhost:8080
+#
+# The frontend's nginx proxies /record and /healthcheck to the "backend"
+# service over the compose network, so the React build does not need to
+# know anything about the backend host.
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: mern-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+      MONGO_INITDB_DATABASE: sample_training
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./mern-project/server
+    container_name: mern-backend
+    restart: unless-stopped
+    environment:
+      ATLAS_URI: "mongodb://root:rootpassword@mongo:27017/sample_training?authSource=admin"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "5050:5050"
+
+  frontend:
+    build:
+      context: ./mern-project/client
+      args:
+        # Empty → React uses relative URLs; nginx in the same container
+        # proxies /record and /healthcheck to "backend:5050".
+        REACT_APP_API_URL: ""
+    container_name: mern-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:8080"
+
+  # Local convenience: run the ETL once on `docker compose up`. In production
+  # this runs as a Kubernetes CronJob (see k8s/etl-cronjob.yaml).
+  etl:
+    build:
+      context: ./python-project
+    container_name: python-etl
+    profiles: ["etl"]    # opt-in: `docker compose --profile etl up etl`
+
+volumes:
+  mongo-data:

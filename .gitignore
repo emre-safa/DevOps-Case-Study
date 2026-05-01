@@ -1,0 +1,146 @@
+# =============================================================================
+# Secrets & local config — NEVER commit these
+# =============================================================================
+.env
+.env.*
+!.env-example
+!.env.example
+config.env
+*.pem
+*.key
+*.crt
+secrets.yaml
+secrets.yml
+
+# kubeconfigs occasionally end up here when people copy them around
+kubeconfig
+kubeconfig.*
+.kube/
+
+# =============================================================================
+# Terraform
+# =============================================================================
+# State and state backups contain resource IDs, ARNs, and sometimes secrets.
+**/*.tfstate
+**/*.tfstate.*
+
+# Local provider downloads + plugin cache (huge, machine-specific).
+**/.terraform/
+
+# Crash logs.
+**/crash.log
+**/crash.*.log
+
+# Local override files — by convention used for personal tweaks.
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# All .tfvars are ignored (they hold real values), EXCEPT the example.
+**/*.tfvars
+**/*.tfvars.json
+!**/terraform.tfvars.example
+!**/*.tfvars.example
+
+# Saved plans.
+**/*.tfplan
+**/tfplan
+
+# DO commit the lock file — it pins provider versions for reproducible builds
+# (analogous to package-lock.json). The terraform/.gitignore in this repo
+# previously ignored it; this rule wins because we negate it explicitly.
+!**/.terraform.lock.hcl
+
+# =============================================================================
+# Node.js (mern-project/client and mern-project/server)
+# =============================================================================
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm/
+.yarn-integrity
+
+# CRA / Vite / generic build output
+build/
+dist/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Test/coverage output
+coverage/
+*.lcov
+.nyc_output/
+
+# Cypress runtime artifacts (the cypress.json config IS committed)
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+
+# =============================================================================
+# Python (python-project)
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.venv/
+venv/
+env/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =============================================================================
+# Docker
+# =============================================================================
+# Compose v2 keeps no on-disk state, but old v1 sometimes leaves these
+.docker/
+docker-compose.override.yml
+
+# =============================================================================
+# Editors / IDEs
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.history/
+
+# =============================================================================
+# OS junk
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# Misc
+# =============================================================================
+# Backup files left by `sed -i.bak` (the README uses this when patching the
+# Fluent Bit ServiceAccount).
+*.bak
+
+# Logs
+*.log
+logs/
+
+# Temp files
+tmp/
+temp/

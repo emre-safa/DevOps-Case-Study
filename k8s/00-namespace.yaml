@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mern
+  labels:
+    name: mern
+    app.kubernetes.io/part-of: mern-devops

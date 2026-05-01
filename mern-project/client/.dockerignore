@@ -1,0 +1,12 @@
+node_modules
+build
+.cache
+.git
+.gitignore
+.env
+.env.*
+cypress
+coverage
+*.log
+Dockerfile
+.dockerignore
